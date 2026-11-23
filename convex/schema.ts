@@ -77,6 +77,7 @@ export default defineSchema({
     dispatchAttempts: v.number(),
     nextDispatchAt: v.optional(v.number()),
     lastError: v.optional(v.string()),
+    dispatchedAt: v.optional(v.number()),
     claimedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
   })

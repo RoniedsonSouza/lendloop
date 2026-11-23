@@ -10,6 +10,7 @@
 
 import type * as admin from "../admin.js";
 import type * as automation_outbox from "../automation/outbox.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_availability from "../lib/availability.js";
@@ -32,6 +33,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   "automation/outbox": typeof automation_outbox;
+  crons: typeof crons;
   http: typeof http;
   "lib/audit": typeof lib_audit;
   "lib/availability": typeof lib_availability;
