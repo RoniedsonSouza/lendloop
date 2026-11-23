@@ -30,6 +30,13 @@ import type { DataModel } from "./dataModel.js";
 type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
+  readonly ALLOW_SEED: string | undefined;
+  readonly APP_TIMEZONE: string | undefined;
+  readonly APP_URL: string | undefined;
+  readonly CLERK_JWT_ISSUER_DOMAIN: string;
+  readonly LENDLOOP_AUTOMATION_SECRET: string | undefined;
+  readonly LENDLOOP_WEBHOOK_SECRET: string | undefined;
+  readonly N8N_LOAN_EVENTS_URL: string | undefined;
 };
 
 /**
