@@ -9,6 +9,8 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as automation_deliveries from "../automation/deliveries.js";
+import type * as automation_http from "../automation/http.js";
 import type * as automation_outbox from "../automation/outbox.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
@@ -32,6 +34,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  "automation/deliveries": typeof automation_deliveries;
+  "automation/http": typeof automation_http;
   "automation/outbox": typeof automation_outbox;
   crons: typeof crons;
   http: typeof http;
