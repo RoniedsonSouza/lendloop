@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "npm-run-all --parallel dev:frontend dev:backend",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:frontend": "next dev",
+    "dev:backend": "convex dev",
+    "setup": "node scripts/setup.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check:workflows": "node scripts/check-workflows.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.10.7",

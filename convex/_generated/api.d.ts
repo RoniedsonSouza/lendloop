@@ -8,13 +8,21 @@
  * @module
  */
 
+import type * as http from "../http.js";
+import type * as lib_hmac from "../lib/hmac.js";
+import type * as skeleton from "../skeleton.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  http: typeof http;
+  "lib/hmac": typeof lib_hmac;
+  skeleton: typeof skeleton;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
