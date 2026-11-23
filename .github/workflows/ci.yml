@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit && npx tsc --noEmit -p convex
+      - name: Lint (includes the authorization import guard)
+        run: npm run lint
+      - name: Tests (Convex functions, HMAC, n8n contract)
+        run: npm test
+      - name: n8n workflow guard (no pinData, no secrets, retries, error workflow, up to date)
+        run: npm run check:workflows
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
