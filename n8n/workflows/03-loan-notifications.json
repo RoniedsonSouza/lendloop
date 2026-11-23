@@ -1,0 +1,535 @@
+{
+  "id": "LlLoanNotify0001",
+  "name": "LendLoop · Loan notifications",
+  "nodes": [
+    {
+      "id": "loan-event-webhook",
+      "name": "Loan event webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lendloop/loan-events",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "webhookId": "3c7e1f62-4a8b-4d5e-9f10-6c3f2a9b0001"
+    },
+    {
+      "id": "read-raw-body",
+      "name": "Read raw body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// WF1: read the exact raw request body and build the string to HMAC (\"<ts>.<raw body>\").\nconst item = $input.first();\nconst raw = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8');\nconst headers = item.json.headers || {};\nconst ts = String(headers['x-lendloop-timestamp'] || '');\nconst signature = String(headers['x-lendloop-signature'] || '');\nreturn [{ json: { raw, ts, signature, signingInput: `${ts}.${raw}` } }];\n"
+      }
+    },
+    {
+      "id": "expected-signature",
+      "name": "Expected signature",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.signingInput }}",
+        "dataPropertyName": "expected",
+        "encoding": "hex"
+      },
+      "credentials": {
+        "crypto": {
+          "id": "LlWebhookSecret1",
+          "name": "LendLoop webhook secret"
+        }
+      }
+    },
+    {
+      "id": "verify-signature",
+      "name": "Verify signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// WF1: constant-time comparison of the provided signature with the one the Crypto node\n// computed (secret lives in the \"LendLoop webhook secret\" credential), plus replay window.\nconst { raw, ts, signature, expected } = $input.first().json;\nconst provided = String(signature);\nconst wanted = 'v1=' + String(expected);\nlet diff = provided.length ^ wanted.length;\nfor (let i = 0; i < wanted.length; i++) diff |= wanted.charCodeAt(i) ^ (provided.charCodeAt(i) || 0);\nconst fresh = /^\\d{1,12}$/.test(ts) && Math.abs(Date.now() / 1000 - Number(ts)) <= 300;\nlet event = null;\nif (diff === 0 && fresh) {\n  try {\n    event = JSON.parse(raw);\n  } catch (e) {\n    event = null;\n  }\n}\nreturn [{ json: { valid: event !== null && typeof event.deliveryKey === 'string', event } }];\n"
+      }
+    },
+    {
+      "id": "signature-valid-",
+      "name": "Signature valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "Signature valid?-c",
+              "leftValue": "={{ $json.valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "reject",
+      "name": "Reject",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\":\"unauthorized\"}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    },
+    {
+      "id": "claim-request",
+      "name": "Claim request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { method: \"POST\", path: '/automation/deliveries/claim', body: { key: $json.event.deliveryKey, kind: 'loan_update' } } }];"
+      }
+    },
+    {
+      "id": "claim-delivery",
+      "name": "Claim delivery",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "LlSignedRequest1",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "should-send-",
+      "name": "Should send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "Should send?-c",
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "send",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "already-handled",
+      "name": "Already handled",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2200,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"duplicate\"}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "accept",
+      "name": "Accept",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2420,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"accepted\"}",
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "id": "render-email",
+      "name": "Render email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// WF1: plain-text email (no HTML: user-provided tool names can't inject markup).\nconst e = $('Verify signature').first().json.event;\nconst fmt = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });\nconst range = `${fmt(e.loan.startDate)} – ${fmt(e.loan.endDate)}`;\nconst tool = e.loan.toolName;\nconst who = e.counterpartFirstName;\nconst templates = {\n  'loan.requested': [`New request for your ${tool}`, `${who} would like to borrow your ${tool} (${range}).\\nApprove or decline: ${e.link}`],\n  'loan.approved': [`Approved: ${tool}`, `${who} approved your request to borrow the ${tool} (${range}).\\nPick-up details: ${e.link}`],\n  'loan.declined': [`Request declined: ${tool}`, `Your request to borrow the ${tool} (${range}) was declined.\\nBrowse other tools: ${e.link}`],\n  'loan.cancelled': [`Cancelled: ${tool}`, `The loan of the ${tool} (${range}) was cancelled.\\nDetails: ${e.link}`],\n  'loan.returned': [`Return confirmed: ${tool}`, `${who} confirmed the ${tool} is back. Thanks for being a good neighbor!\\n${e.link}`],\n};\nconst [subject, body] = templates[e.type] || [`Update on ${tool}`, `There is an update on the ${tool}.\\n${e.link}`];\nreturn [{ json: { to: e.recipient.email, subject: `LendLoop · ${subject}`, text: `Hi ${e.recipient.firstName},\\n\\n${body}\\n\\n— LendLoop` } }];\n"
+      }
+    },
+    {
+      "id": "send-email",
+      "name": "Send email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2860,
+        0
+      ],
+      "parameters": {
+        "fromEmail": "LendLoop <no-reply@lendloop.local>",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "LlSmtpCred000001",
+          "name": "LendLoop SMTP"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "complete-sent",
+      "name": "Complete sent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { method: \"POST\", path: '/automation/deliveries/complete', body: { key: $('Verify signature').first().json.event.deliveryKey, outcome: 'sent' } } }];"
+      }
+    },
+    {
+      "id": "record-sent",
+      "name": "Record sent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3300,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "LlSignedRequest1",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "complete-failed",
+      "name": "Complete failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { method: \"POST\", path: '/automation/deliveries/complete', body: { key: $('Verify signature').first().json.event.deliveryKey, outcome: 'failed', error: String($json.error?.message ?? 'smtp error').slice(0, 200) } } }];"
+      }
+    },
+    {
+      "id": "record-failure",
+      "name": "Record failure",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3740,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "LlSignedRequest1",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "fail-run",
+      "name": "Fail run",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        3960,
+        0
+      ],
+      "parameters": {
+        "errorMessage": "Notification email could not be sent"
+      }
+    }
+  ],
+  "connections": {
+    "Loan event webhook": {
+      "main": [
+        [
+          {
+            "node": "Read raw body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read raw body": {
+      "main": [
+        [
+          {
+            "node": "Expected signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expected signature": {
+      "main": [
+        [
+          {
+            "node": "Verify signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify signature": {
+      "main": [
+        [
+          {
+            "node": "Signature valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature valid?": {
+      "main": [
+        [
+          {
+            "node": "Claim request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim request": {
+      "main": [
+        [
+          {
+            "node": "Claim delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim delivery": {
+      "main": [
+        [
+          {
+            "node": "Should send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should send?": {
+      "main": [
+        [
+          {
+            "node": "Accept",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Already handled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept": {
+      "main": [
+        [
+          {
+            "node": "Render email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render email": {
+      "main": [
+        [
+          {
+            "node": "Send email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send email": {
+      "main": [
+        [
+          {
+            "node": "Complete sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Complete failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete sent": {
+      "main": [
+        [
+          {
+            "node": "Record sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete failed": {
+      "main": [
+        [
+          {
+            "node": "Record failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record failure": {
+      "main": [
+        [
+          {
+            "node": "Fail run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "errorWorkflow": "LlErrorHandler01"
+  },
+  "tags": []
+}

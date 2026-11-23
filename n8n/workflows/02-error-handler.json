@@ -1,0 +1,146 @@
+{
+  "id": "LlErrorHandler01",
+  "name": "LendLoop · Error handler",
+  "nodes": [
+    {
+      "id": "on-workflow-error",
+      "name": "On workflow error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "build-incident",
+      "name": "Build incident",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// WF3: summarize the failure without copying any payload data (no personal data in alerts).\nconst { execution = {}, workflow = {} } = $input.first().json;\nconst error = execution.error || {};\nconst message = String(error.message || 'Unknown error').slice(0, 500);\nconst failedNode = error.node && error.node.name ? String(error.node.name) : (execution.lastNodeExecuted || undefined);\nreturn [{\n  json: {\n    method: 'POST',\n    path: '/automation/incidents',\n    body: { executionId: String(execution.id ?? `unknown-${Date.now()}`), workflowName: String(workflow.name || 'unknown'), failedNode, message },\n    subject: `LendLoop automation failure: ${workflow.name || 'unknown workflow'}`,\n    text: `Workflow: ${workflow.name}\\nFailed node: ${failedNode || 'n/a'}\\nExecution: ${execution.url || execution.id}\\nError: ${message}`,\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "alert-ops",
+      "name": "Alert ops",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "fromEmail": "LendLoop <no-reply@lendloop.local>",
+        "toEmail": "={{ $env.OPS_ALERT_EMAIL }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "LlSmtpCred000001",
+          "name": "LendLoop SMTP"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "incident-request",
+      "name": "Incident request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const i = $('Build incident').first().json;\nreturn [{ json: { method: i.method, path: i.path, body: i.body } }];"
+      }
+    },
+    {
+      "id": "record-incident",
+      "name": "Record incident",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "LlSignedRequest1",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "On workflow error": {
+      "main": [
+        [
+          {
+            "node": "Build incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build incident": {
+      "main": [
+        [
+          {
+            "node": "Alert ops",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert ops": {
+      "main": [
+        [
+          {
+            "node": "Incident request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Incident request": {
+      "main": [
+        [
+          {
+            "node": "Record incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false
+  },
+  "tags": []
+}

@@ -23,6 +23,7 @@ import type * as lib_functions from "../lib/functions.js";
 import type * as lib_hmac from "../lib/hmac.js";
 import type * as lib_loanRules from "../lib/loanRules.js";
 import type * as loans from "../loans.js";
+import type * as seed from "../seed.js";
 import type * as tools from "../tools.js";
 import type * as users from "../users.js";
 
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   "lib/hmac": typeof lib_hmac;
   "lib/loanRules": typeof lib_loanRules;
   loans: typeof loans;
+  seed: typeof seed;
   tools: typeof tools;
   users: typeof users;
 }>;

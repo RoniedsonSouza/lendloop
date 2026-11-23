@@ -1,0 +1,134 @@
+{
+  "id": "LlSignedRequest1",
+  "name": "LendLoop · Signed Convex request",
+  "nodes": [
+    {
+      "id": "when-called",
+      "name": "When called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "prepare-signature",
+      "name": "Prepare signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// SUB: serialize the body exactly once; the same string is signed and sent.\nconst { method, path, body } = $input.first().json;\nconst raw = method === 'GET' ? '' : JSON.stringify(body ?? {});\nconst ts = Math.floor(Date.now() / 1000);\nreturn [{ json: { method, path, raw, ts, signingInput: `${ts}.${raw}` } }];\n"
+      }
+    },
+    {
+      "id": "hmac",
+      "name": "HMAC",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.signingInput }}",
+        "dataPropertyName": "signature",
+        "encoding": "hex"
+      },
+      "credentials": {
+        "crypto": {
+          "id": "LlAutomationSec1",
+          "name": "LendLoop automation secret"
+        }
+      }
+    },
+    {
+      "id": "call-convex",
+      "name": "Call Convex",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $env.LENDLOOP_CONVEX_URL }}{{ $json.path }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LendLoop-Timestamp",
+              "value": "={{ $json.ts }}"
+            },
+            {
+              "name": "X-LendLoop-Signature",
+              "value": "=v1={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.raw }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "When called": {
+      "main": [
+        [
+          {
+            "node": "Prepare signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare signature": {
+      "main": [
+        [
+          {
+            "node": "HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC": {
+      "main": [
+        [
+          {
+            "node": "Call Convex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false
+  },
+  "tags": []
+}
