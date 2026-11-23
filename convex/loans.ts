@@ -4,7 +4,8 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { memberMutation, memberQuery } from "./lib/functions";
 import { LIMITS, nextStatus, type LoanAction } from "./lib/domain";
 import { appError } from "./lib/errors";
-import { addDays, appTimezone, daysBetween, isIsoDate, rangesOverlap, today as todayIn } from "./lib/dates";
+import { addDays, daysBetween, isIsoDate, rangesOverlap, today as todayIn } from "./lib/dates";
+import { appTimezone } from "./lib/config";
 import { enqueueLoanUpdate } from "./automation/outbox";
 import { deliveryKindValidator, loanStatusValidator, recipientRoleValidator } from "./schema";
 

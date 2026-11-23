@@ -6,7 +6,8 @@ import { ConvexError } from "convex/values";
 import { env, httpAction, type ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { SIGNATURE_HEADER, TIMESTAMP_HEADER, verifySignature } from "../lib/hmac";
-import { appTimezone, today } from "../lib/dates";
+import { today } from "../lib/dates";
+import { appTimezone } from "../lib/config";
 
 const MAX_BODY_BYTES = 16_384;
 

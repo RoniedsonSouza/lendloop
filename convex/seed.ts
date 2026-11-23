@@ -6,7 +6,8 @@ import { v } from "convex/values";
 import { env, internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { appError } from "./lib/errors";
-import { addDays, appTimezone, today as todayIn } from "./lib/dates";
+import { addDays, today as todayIn } from "./lib/dates";
+import { appTimezone } from "./lib/config";
 import type { Category, Condition } from "./lib/domain";
 import { enqueueLoanUpdate } from "./automation/outbox";
 

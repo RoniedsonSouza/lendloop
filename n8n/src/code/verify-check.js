@@ -10,7 +10,7 @@ let event = null;
 if (diff === 0 && fresh) {
   try {
     event = JSON.parse(raw);
-  } catch (e) {
+  } catch {
     event = null;
   }
 }

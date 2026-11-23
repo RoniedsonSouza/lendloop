@@ -1,5 +1,3 @@
-import { env } from "../_generated/server";
-
 /** Calendar dates are `YYYY-MM-DD` strings in the app's single timezone. */
 const DAY_MS = 86_400_000;
 
@@ -33,8 +31,4 @@ export function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd
 
 export function isIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && addDays(value, 0) === value;
-}
-
-export function appTimezone(): string {
-  return env.APP_TIMEZONE ?? "America/Sao_Paulo";
 }

@@ -7,7 +7,8 @@ import { categoryValidator, conditionValidator } from "./schema";
 import { LIMITS } from "./lib/domain";
 import { appError } from "./lib/errors";
 import { activeLoansByTool, availabilityFor } from "./lib/availability";
-import { appTimezone, today as todayIn } from "./lib/dates";
+import { today as todayIn } from "./lib/dates";
+import { appTimezone } from "./lib/config";
 import { recordAudit } from "./lib/audit";
 import { cancelOpenLoansForTool } from "./lib/loanRules";
 

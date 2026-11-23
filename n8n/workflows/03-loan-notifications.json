@@ -67,7 +67,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "// WF1: constant-time comparison of the provided signature with the one the Crypto node\n// computed (secret lives in the \"LendLoop webhook secret\" credential), plus replay window.\nconst { raw, ts, signature, expected } = $input.first().json;\nconst provided = String(signature);\nconst wanted = 'v1=' + String(expected);\nlet diff = provided.length ^ wanted.length;\nfor (let i = 0; i < wanted.length; i++) diff |= wanted.charCodeAt(i) ^ (provided.charCodeAt(i) || 0);\nconst fresh = /^\\d{1,12}$/.test(ts) && Math.abs(Date.now() / 1000 - Number(ts)) <= 300;\nlet event = null;\nif (diff === 0 && fresh) {\n  try {\n    event = JSON.parse(raw);\n  } catch (e) {\n    event = null;\n  }\n}\nreturn [{ json: { valid: event !== null && typeof event.deliveryKey === 'string', event } }];\n"
+        "jsCode": "// WF1: constant-time comparison of the provided signature with the one the Crypto node\n// computed (secret lives in the \"LendLoop webhook secret\" credential), plus replay window.\nconst { raw, ts, signature, expected } = $input.first().json;\nconst provided = String(signature);\nconst wanted = 'v1=' + String(expected);\nlet diff = provided.length ^ wanted.length;\nfor (let i = 0; i < wanted.length; i++) diff |= wanted.charCodeAt(i) ^ (provided.charCodeAt(i) || 0);\nconst fresh = /^\\d{1,12}$/.test(ts) && Math.abs(Date.now() / 1000 - Number(ts)) <= 300;\nlet event = null;\nif (diff === 0 && fresh) {\n  try {\n    event = JSON.parse(raw);\n  } catch {\n    event = null;\n  }\n}\nreturn [{ json: { valid: event !== null && typeof event.deliveryKey === 'string', event } }];\n"
       }
     },
     {
