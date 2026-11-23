@@ -54,13 +54,13 @@ const setRequest = (name, method, path, bodyExpr) =>
   node(name, "n8n-nodes-base.code", 2, {
     jsCode: `return [{ json: { method: ${JSON.stringify(method)}, path: ${path}, body: ${bodyExpr} } }];`,
   });
-const callSigned = (name) =>
+const callSigned = (name, extra = {}) =>
   node(name, "n8n-nodes-base.executeWorkflow", 1.2, {
     source: "database",
     workflowId: { __rl: true, value: IDS.signedRequest, mode: "id" },
     mode: "each",
     options: { waitForSubWorkflow: true },
-  });
+  }, extra);
 const respond = (name, code, body) =>
   node(name, "n8n-nodes-base.respondToWebhook", 1.1, {
     respondWith: "json", responseBody: JSON.stringify(body), options: { responseCode: code },
@@ -157,21 +157,25 @@ const overdue = workflow(IDS.overdue, "LendLoop · Daily overdue reminders", [
   setRequest("Overdue request", "GET", "'/automation/overdue-loans'", "null"),
   callSigned("Fetch overdue loans"),
   node("One item per loan", "n8n-nodes-base.splitOut", 1, { fieldToSplitOut: "loans", options: {} }),
+  // batchSize must stay 1: loop nodes reference the current loan with $('Loop over loans').first().
   node("Loop over loans", "n8n-nodes-base.splitInBatches", 3, { batchSize: 1, options: {} }),
   setRequest("Claim request", "POST", "'/automation/deliveries/claim'",
     "{ key: `reminder:${$('Loop over loans').first().json.loanId}:${$('Fetch overdue loans').first().json.asOf}`, kind: 'overdue_reminder', loanId: $('Loop over loans').first().json.loanId }"),
-  callSigned("Claim reminder"),
+  // A failure for one loan is recorded and the loop continues with the next borrower.
+  callSigned("Claim reminder", { onError: "continueErrorOutput" }),
   ifNode("Should send?", "={{ $json.decision }}", "equals", "send"),
   codeNode("Render reminder", "render-reminder"),
   email("Send reminder", "={{ $json.to }}", "continueErrorOutput"),
   setRequest("Complete sent", "POST", "'/automation/deliveries/complete'",
     "{ key: `reminder:${$('Loop over loans').first().json.loanId}:${$('Fetch overdue loans').first().json.asOf}`, outcome: 'sent' }"),
-  callSigned("Record sent"),
+  callSigned("Record sent", { onError: "continueErrorOutput" }),
   setRequest("Complete failed", "POST", "'/automation/deliveries/complete'",
     "{ key: `reminder:${$('Loop over loans').first().json.loanId}:${$('Fetch overdue loans').first().json.asOf}`, outcome: 'failed', error: String($json.error?.message ?? 'smtp error').slice(0, 200) }"),
-  callSigned("Record failure"),
+  callSigned("Record failure", { onError: "continueErrorOutput" }),
+  node("Mark failed", "n8n-nodes-base.code", 2, { jsCode: "return [{ json: { failed: true } }];" }),
   node("Count failures", "n8n-nodes-base.code", 2, {
-    jsCode: "let failed = 0;\ntry { failed = $('Record failure').all().length; } catch (e) { failed = 0; }\nreturn [{ json: { failed } }];",
+    // The loop's "done" output carries every item fed back into it (one per loan).
+    jsCode: "const failed = $input.all().filter((i) => i.json.status === 'failed' || i.json.failed === true).length;\nreturn [{ json: { failed } }];",
   }),
   ifNode("Any failure?", "={{ $json.failed > 0 }}", "true"),
   node("Fail run", "n8n-nodes-base.stopAndError", 1, { errorMessage: "={{ $json.failed }} overdue reminder(s) could not be sent" }),
@@ -185,6 +189,8 @@ const overdue = workflow(IDS.overdue, "LendLoop · Daily overdue reminders", [
   ["Send reminder", 0, "Complete sent"], ["Send reminder", 1, "Complete failed"],
   ["Complete sent", 0, "Record sent"], ["Record sent", 0, "Loop over loans"],
   ["Complete failed", 0, "Record failure"], ["Record failure", 0, "Loop over loans"],
+  ["Claim reminder", 1, "Mark failed"], ["Record sent", 1, "Mark failed"], ["Record failure", 1, "Mark failed"],
+  ["Mark failed", 0, "Loop over loans"],
   ["Count failures", 0, "Any failure?"], ["Any failure?", 0, "Fail run"],
 ], onErrors);
 

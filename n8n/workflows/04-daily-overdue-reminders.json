@@ -131,7 +131,8 @@
         "options": {
           "waitForSubWorkflow": true
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "id": "should-send-",
@@ -240,7 +241,8 @@
         "options": {
           "waitForSubWorkflow": true
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "id": "complete-failed",
@@ -275,6 +277,20 @@
         "options": {
           "waitForSubWorkflow": true
         }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "mark-failed",
+      "name": "Mark failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { failed: true } }];"
       }
     },
     {
@@ -283,11 +299,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3520,
+        3740,
         0
       ],
       "parameters": {
-        "jsCode": "let failed = 0;\ntry { failed = $('Record failure').all().length; } catch (e) { failed = 0; }\nreturn [{ json: { failed } }];"
+        "jsCode": "const failed = $input.all().filter((i) => i.json.status === 'failed' || i.json.failed === true).length;\nreturn [{ json: { failed } }];"
       }
     },
     {
@@ -296,7 +312,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        3740,
+        3960,
         0
       ],
       "parameters": {
@@ -329,7 +345,7 @@
       "type": "n8n-nodes-base.stopAndError",
       "typeVersion": 1,
       "position": [
-        3960,
+        4180,
         0
       ],
       "parameters": {
@@ -430,6 +446,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Mark failed",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -499,6 +522,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Mark failed",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -514,6 +544,24 @@
       ]
     },
     "Record failure": {
+      "main": [
+        [
+          {
+            "node": "Loop over loans",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark failed": {
       "main": [
         [
           {

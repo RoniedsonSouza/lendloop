@@ -216,7 +216,7 @@ X-LendLoop-Signature: v1=<hex HMAC-SHA256(secret, "<timestamp>.<raw body>")>
 ```
 
 - **Exact bytes:** the signature covers the raw body. n8n reads the webhook's raw body, and the sub-workflow serializes once and sends that same string.
-- **Replay window:** ±300 s. Replays inside the window are harmless because every write is idempotent.
+- **Replay window:** ±300 s. Replays inside the window cannot cause duplicate messages or records: every write goes through the delivery ledger, which deduplicates by key.
 - **Constant-time comparison:** Convex uses `crypto.subtle.verify`; the n8n Code node uses an XOR loop.
 - **One secret per direction.**
 - **Where the n8n secrets live:** in **encrypted n8n credentials** (type `crypto`, used by the Crypto node), not in env vars or Code nodes. The running n8n container has no secret in its environment.
@@ -287,7 +287,7 @@ claim(key): new / queued / dispatched / failed / dead → "send"     claimed / s
 - **Profile:** we store name and email from Clerk, nothing else. No phone, address or avatar. The description field asks people not to include contact details.
 - **n8n payloads** carry only what the message needs: event type, delivery key, tool name, dates, the recipient's first name and email, the other party's first name, and a link. They carry no user IDs and no descriptions. The incident record contains workflow, node and error text only.
 - **Retention:**
-  - n8n doesn't store successful executions (`EXECUTIONS_DATA_SAVE_ON_SUCCESS=none`), and keeps failed ones for 7 days.
+  - n8n doesn't store successful executions (`EXECUTIONS_DATA_SAVE_ON_SUCCESS=none`). Failed executions are kept for 7 days so they can be inspected and retried; they can contain the recipient's first name and email (a deliberate debugging trade-off — set `EXECUTIONS_DATA_SAVE_ON_ERROR=none` to rely only on the incidents table).
   - Convex purges delivery records and incidents after 90 days.
   - Logs reference IDs, never email addresses.
 
@@ -296,7 +296,7 @@ claim(key): new / queued / dispatched / failed / dead → "send"     claimed / s
 ## Testing
 
 ```bash
-npm test                 # 76 tests: Convex functions (convex-test), HMAC, n8n contract tests
+npm test                 # 84 tests: Convex functions (convex-test), HMAC, n8n contract tests
 npm run lint             # includes @convex-dev/eslint-plugin and the authorization guard
 npx tsc --noEmit -p convex && npx tsc --noEmit
 npm run check:workflows

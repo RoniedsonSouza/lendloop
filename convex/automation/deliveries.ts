@@ -34,7 +34,10 @@ export const claim = internalMutation({
     if (kind !== "overdue_reminder" || !loanId) throw appError("NOT_FOUND", "Unknown delivery");
     const loan = await ctx.db.get("loans", loanId);
     if (!loan) throw appError("NOT_FOUND", "Unknown loan");
-    if (key !== `reminder:${loanId}:${key.split(":")[2]}`) throw appError("INVALID", "Key does not match loan");
+    const asOf = key.split(":")[2];
+    if (key !== `reminder:${loanId}:${asOf}`) throw appError("INVALID", "Key does not match loan");
+    // The loan may have been returned between the overdue fetch and this claim.
+    if (loan.status !== "approved" || loan.endDate >= asOf) return { decision: "skip" as const, reason: "not_overdue" };
     await ctx.db.insert("deliveries", {
       key,
       kind,

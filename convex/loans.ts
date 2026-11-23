@@ -92,7 +92,14 @@ export const approve = memberMutation({
   handler: async (ctx, { loanId }) => {
     const loan = await loadLoan(ctx, loanId);
     if (loan.ownerId !== ctx.user._id) throw appError("FORBIDDEN", "Only the owner can approve");
+    const today = serverToday();
+    if (loan.status === "requested" && loan.startDate < today) {
+      throw appError("CONFLICT", "This request's start date has passed; decline it instead");
+    }
     const approved = await approvedLoansForTool(ctx, loan.toolId);
+    if (approved.some((l) => l.endDate < today)) {
+      throw appError("CONFLICT", "The tool has not come back from an overdue loan yet");
+    }
     if (approved.some((l) => rangesOverlap(loan.startDate, loan.endDate, l.startDate, l.endDate))) {
       throw appError("CONFLICT", "Those dates overlap an approved loan");
     }
@@ -216,13 +223,23 @@ export async function toLoanView(ctx: QueryCtx, loan: Doc<"loans">, counterpartI
   };
 }
 
+/**
+ * The index is [userId, status], so each status is read separately: open loans are never
+ * crowded out by a long history (history is capped per status).
+ */
 async function listFor(ctx: QueryCtx, index: "by_borrower" | "by_owner", userId: Id<"users">) {
-  const rows = await ctx.db
-    .query("loans")
-    .withIndex(index, (q) => q.eq(index === "by_borrower" ? "borrowerId" : "ownerId", userId))
-    .order("desc")
-    .take(200);
-  return rows.sort((a, b) => b._creationTime - a._creationTime);
+  const field = index === "by_borrower" ? "borrowerId" : "ownerId";
+  const limits = { requested: 200, approved: 200, returned: 50, declined: 25, cancelled: 25 } as const;
+  const groups = await Promise.all(
+    (Object.keys(limits) as (keyof typeof limits)[]).map((status) =>
+      ctx.db
+        .query("loans")
+        .withIndex(index, (q) => q.eq(field, userId).eq("status", status))
+        .order("desc")
+        .take(limits[status]),
+    ),
+  );
+  return groups.flat().sort((a, b) => b._creationTime - a._creationTime);
 }
 
 export const myRequests = memberQuery({
