@@ -18,5 +18,9 @@ export default defineConfig({
   projects: [
     { name: "setup", testMatch: /global\.setup\.ts/ },
     { name: "e2e", testMatch: /.*\.spec\.ts/, dependencies: ["setup"], use: { ...devices["Desktop Chrome"] } },
+    // README screenshots, opt-in only (see e2e/screenshots.capture.ts).
+    ...(process.env.SCREENSHOTS
+      ? [{ name: "screenshots", testMatch: /screenshots\.capture\.ts/, dependencies: ["setup"], use: { ...devices["Desktop Chrome"] } }]
+      : []),
   ],
 });
