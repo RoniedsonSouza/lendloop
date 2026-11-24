@@ -11,16 +11,16 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Typecheck
-        run: npx tsc --noEmit && npx tsc --noEmit -p convex
+      - name: Typecheck (generates Next route types first)
+        run: npm run typecheck
       - name: Lint (includes the authorization import guard)
         run: npm run lint
       - name: Tests (Convex functions, HMAC, n8n contract)
