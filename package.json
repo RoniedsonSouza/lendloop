@@ -14,7 +14,8 @@
     "typecheck": "next typegen && tsc --noEmit && tsc --noEmit -p convex",
     "check:workflows": "node scripts/check-workflows.mjs",
     "n8n:build": "node n8n/src/build.mjs",
-    "n8n:remind": "docker compose exec -e N8N_RUNNERS_BROKER_PORT=5690 n8n n8n execute --id LlOverdueRemind1"
+    "n8n:remind": "docker compose exec -e N8N_RUNNERS_BROKER_PORT=5690 n8n n8n execute --id LlOverdueRemind1",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.10.7",
@@ -26,13 +27,16 @@
     "sonner": "^2.0.8"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.3.7",
     "@convex-dev/eslint-plugin": "^5.0.1",
     "@edge-runtime/vm": "^5.0.0",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "convex-test": "^0.0.73",
+    "dotenv": "^18.0.10",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "npm-run-all": "^4.1.5",
