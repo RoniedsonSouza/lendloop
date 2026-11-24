@@ -43,3 +43,6 @@ next-env.d.ts
 .secrets/
 .convex/
 .superpowers/
+e2e/.auth/
+/test-results/
+/playwright-report/
