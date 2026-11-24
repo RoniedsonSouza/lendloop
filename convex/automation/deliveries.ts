@@ -4,7 +4,8 @@
  *
  *   claim(key)    -> "send" if the message is new, queued/dispatched, or previously failed
  *                 -> "skip" if it is claimed (in flight), sent, or stale
- *   complete(key) -> sent | failed; repeating it is a no-op
+ *   complete(key) -> sent | failed; only a claimed delivery can be completed, and
+ *                    repeating the same outcome is a no-op
  *
  * Convex mutations are serializable: two concurrent claims of the same key conflict on
  * the by_key index read, Convex re-runs the loser, and it sees the first claim -> "skip".
@@ -61,7 +62,9 @@ export const complete = internalMutation({
       .withIndex("by_key", (q) => q.eq("key", key))
       .unique();
     if (!d) throw appError("NOT_FOUND", "Unknown delivery");
-    if (d.status === "sent") return { status: "sent" };
+    if (d.status === "sent" || d.status === outcome) return { status: d.status };
+    // Only the sender that claimed the delivery may report on it.
+    if (d.status !== "claimed") throw appError("CONFLICT", "Delivery was not claimed");
     const now = Date.now();
     await ctx.db.patch("deliveries", d._id, {
       status: outcome,

@@ -200,21 +200,36 @@ export const sweep = internalMutation({
   },
 });
 
-/** Cron: data minimization — drop completed delivery records and incidents after 90 days. */
+export const PURGE_BATCH = 100;
+
+/**
+ * Cron: data minimization — drop completed delivery records and incidents after 90 days.
+ * Works in bounded batches and reschedules itself until nothing old is left.
+ */
 export const purgeOld = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
     const cutoff = Date.now() - 90 * 86_400_000;
+    let more = false;
     for (const status of ["sent", "failed", "dead", "stale"] as const) {
       const rows = await ctx.db
         .query("deliveries")
         .withIndex("by_status_next", (q) => q.eq("status", status))
-        .take(500);
-      for (const d of rows) if (d._creationTime < cutoff) await ctx.db.delete("deliveries", d._id);
+        // No index on (status, _creationTime); the scan is bounded by the batch and the daily cadence.
+        // eslint-disable-next-line @convex-dev/no-filter-in-query
+        .filter((q) => q.lt(q.field("_creationTime"), cutoff))
+        .take(PURGE_BATCH);
+      for (const d of rows) await ctx.db.delete("deliveries", d._id);
+      more ||= rows.length === PURGE_BATCH;
     }
-    const incidents = await ctx.db.query("incidents").order("asc").take(500);
-    for (const i of incidents) if (i._creationTime < cutoff) await ctx.db.delete("incidents", i._id);
+    const incidents = await ctx.db
+      .query("incidents")
+      .withIndex("by_creation_time", (q) => q.lt("_creationTime", cutoff))
+      .take(PURGE_BATCH);
+    for (const i of incidents) await ctx.db.delete("incidents", i._id);
+    more ||= incidents.length === PURGE_BATCH;
+    if (more) await ctx.scheduler.runAfter(0, internal.automation.outbox.purgeOld, {});
     return null;
   },
 });

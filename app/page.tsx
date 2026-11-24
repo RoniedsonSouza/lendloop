@@ -2,14 +2,12 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { preloadQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
-import { today } from "@/convex/lib/dates";
-import { APP_TIMEZONE } from "@/lib/format";
 import { AuthCta } from "./_components/AuthCta";
 import { PublicToolList } from "./_components/PublicToolList";
 
 async function AvailableTools() {
-  await connection(); // "today" depends on the request time
-  const preloaded = await preloadQuery(api.tools.listAvailablePublic, { today: today(APP_TIMEZONE) });
+  await connection(); // availability depends on the request time
+  const preloaded = await preloadQuery(api.tools.listAvailablePublic, {});
   return <PublicToolList preloaded={preloaded} />;
 }
 
