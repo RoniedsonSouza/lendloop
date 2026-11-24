@@ -15,7 +15,9 @@
     "check:workflows": "node scripts/check-workflows.mjs",
     "n8n:build": "node n8n/src/build.mjs",
     "n8n:remind": "docker compose exec -e N8N_RUNNERS_BROKER_PORT=5690 n8n n8n execute --id LlOverdueRemind1",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "demo": "node scripts/demo.mjs",
+    "demo:seed": "node scripts/demo-seed.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.10.7",
