@@ -1,0 +1,53 @@
+name: E2E
+
+# Optional: runs only when the repository has Clerk dev-instance secrets configured.
+# Without them the job is skipped (the required checks live in ci.yml).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HAS_CLERK: ${{ secrets.CLERK_SECRET_KEY != '' }}
+    steps:
+      - name: Skip without Clerk secrets
+        if: env.HAS_CLERK != 'true'
+        run: echo "::notice::CLERK_* secrets not set; E2E skipped."
+      - uses: actions/checkout@v5
+        if: env.HAS_CLERK == 'true'
+      - uses: actions/setup-node@v5
+        if: env.HAS_CLERK == 'true'
+        with:
+          node-version: 24
+          cache: npm
+      - if: env.HAS_CLERK == 'true'
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Write .env.local from secrets
+        if: env.HAS_CLERK == 'true'
+        env:
+          PK: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          SK: ${{ secrets.CLERK_SECRET_KEY }}
+          ISSUER: ${{ secrets.CLERK_JWT_ISSUER_DOMAIN }}
+        run: |
+          umask 077
+          printf 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=%s\nCLERK_SECRET_KEY=%s\nCLERK_JWT_ISSUER_DOMAIN=%s\nNEXT_PUBLIC_APP_TIMEZONE=America/Sao_Paulo\n' "$PK" "$SK" "$ISSUER" > .env.local
+      - name: Start the demo stack
+        if: env.HAS_CLERK == 'true'
+        run: |
+          nohup npm run demo > demo.log 2>&1 &
+          npx --yes wait-on@8 -t 300000 http://localhost:3000 tcp:127.0.0.1:3210 http://localhost:8025
+      - name: Playwright
+        if: env.HAS_CLERK == 'true'
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure() && env.HAS_CLERK == 'true'
+        with:
+          name: playwright-report
+          path: playwright-report/
