@@ -55,11 +55,12 @@ async function getActiveTool(ctx: MutationCtx, toolId: Id<"tools">) {
 }
 
 /** Public landing page: available tools only, name + category only (no owner data). */
+/** Public landing list. "today" is computed here so a caller can't make a lent tool look available. */
 export const listAvailablePublic = publicQuery({
-  args: { today: v.string() },
+  args: {},
   returns: v.array(v.object({ _id: v.id("tools"), name: v.string(), category: categoryValidator })),
-  handler: async (ctx, { today }) => {
-    const onLoan = await activeLoansByTool(ctx, today);
+  handler: async (ctx) => {
+    const onLoan = await activeLoansByTool(ctx, todayIn(appTimezone()));
     const recent = await ctx.db
       .query("tools")
       .withIndex("by_status", (q) => q.eq("status", "active"))

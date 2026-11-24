@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import { setup, signIn, TOOL } from "./test.setup";
 
@@ -6,6 +6,8 @@ const TODAY = "2026-11-23";
 
 describe("tools", () => {
   test("listAvailablePublic projection exposes only id, name and category of available tools", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${TODAY}T15:00:00Z`));
     const t = setup();
     const ana = await signIn(t, "Ana");
     const bob = await signIn(t, "Bob");
@@ -19,9 +21,10 @@ describe("tools", () => {
         startDate: "2026-11-20", endDate: "2026-11-25", status: "approved",
       }),
     );
-    const rows = await t.query(api.tools.listAvailablePublic, { today: TODAY });
+    const rows = await t.query(api.tools.listAvailablePublic, {});
     expect(rows.map((r) => r._id)).toEqual([available]);
     expect(Object.keys(rows[0]).sort()).toEqual(["_id", "category", "name"]);
+    vi.useRealTimers();
   });
 
   test("create rejects a too-short name", async () => {
