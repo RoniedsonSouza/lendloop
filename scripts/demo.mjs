@@ -42,17 +42,32 @@ if (missing.length) {
   process.exit(1);
 }
 
-step(1, "Convex local deployment: deploy functions");
-if (await portInUse(3210)) {
+const convexRunning = await portInUse(3210);
+// "anonymous" agent mode creates a local deployment without a Convex account or prompts.
+const ANON = { CONVEX_AGENT_MODE: "anonymous" };
+
+step(1, "Convex local deployment");
+if (convexRunning) {
   // A running `convex dev` owns the local backend and already pushes function changes.
-  console.log("Convex local backend already running on :3210 (convex dev) — skipping.");
-} else {
-  // "anonymous" agent mode creates a local deployment without a Convex account or prompts.
-  run("npx", ["convex", "dev", "--once"], { CONVEX_AGENT_MODE: "anonymous" });
+  console.log("Convex local backend already running on :3210 (convex dev) — reusing it.");
+} else if (!readEnv(".env.local").NEXT_PUBLIC_CONVEX_SITE_URL) {
+  // First run: create the deployment. The push itself fails until CLERK_JWT_ISSUER_DOMAIN
+  // is set in Convex (step 2), which needs the deployment to exist — so tolerate that here.
+  try {
+    execFileSync("npx", ["convex", "dev", "--once"], { stdio: "inherit", env: { ...process.env, ...ANON } });
+  } catch {
+    if (!readEnv(".env.local").NEXT_PUBLIC_CONVEX_SITE_URL) {
+      console.error("\nFailed to create the Convex local deployment (see output above).");
+      process.exit(1);
+    }
+    console.log("(Expected on first run: Convex env is configured next.)");
+  }
 }
 
 step(2, "Secrets and Convex environment");
 run("node", ["scripts/setup.mjs"]);
+// Push functions now that CLERK_JWT_ISSUER_DOMAIN is set (a running `convex dev` does this itself).
+if (!convexRunning) run("npx", ["convex", "dev", "--once"], ANON);
 
 step(3, "n8n + Mailpit (Docker)");
 run("docker", ["compose", "up", "-d", "--wait", "n8n", "mailpit"]);
